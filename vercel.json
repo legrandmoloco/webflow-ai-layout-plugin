@@ -1,19 +1,18 @@
 {
   "version": 2,
-  "builds": [
-    {
-      "src": "proxy-server.js",
-      "use": "@vercel/node"
+  "functions": {
+    "proxy-server.js": {
+      "runtime": "@vercel/node@18"
     }
-  ],
+  },
   "routes": [
     {
-      "src": "/api/(.*)",
+      "src": "/api/openai",
       "dest": "/proxy-server.js"
     },
     {
       "src": "/(.*)",
-      "dest": "/index.html"
+      "dest": "/$1"
     }
   ],
   "headers": [
