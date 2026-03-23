@@ -1,0 +1,6 @@
+{
+  "redirectUri": "https://69c19f3acc548cdd6f455e65.webflow-ext.com",
+  "clientId": "ecdfe27d32c720f5619f3b834b9c7cbb45c1d5fa743c5d1ea5632fb2a25a9114",
+  "clientSecret": "d3f46f7f427f6a25e97d2a503027c4e549afdf26fe59a1293668400ed154baf8",
+  "note": "Replace the empty strings above with your actual Webflow OAuth credentials. This file is used to configure the manifest.json during build."
+}

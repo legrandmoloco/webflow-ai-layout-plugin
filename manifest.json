@@ -1,0 +1,21 @@
+{
+  "name": "AI Layout Generator",
+  "displayName": "AI Layout Generator",
+  "version": "1.0.0",
+  "description": "Generate page layouts using AI from screenshots or prompts",
+  "author": "Your Name",
+  "main": "index.html",
+  "permissions": ["sites:read", "sites:write", "pages:write"],
+  "devModeUrl": "http://localhost:8080",
+  "oauth": {
+    "redirectUri": "{{REDIRECT_URI}}",
+    "clientId": "{{CLIENT_ID}}",
+    "clientSecret": "{{CLIENT_SECRET}}"
+  },
+  "scopes": ["sites:read", "sites:write", "pages:write"],
+  "contentSecurityPolicy": {
+    "script-src": "'self' 'unsafe-inline' 'unsafe-eval'",
+    "connect-src": "'self' https://api.anthropic.com",
+    "img-src": "'self' data: blob:"
+  }
+}

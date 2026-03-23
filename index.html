@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Layout Generator</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #fff;
+        }
+
+        .ai-layout-panel {
+            background: #fff;
+            border-radius: 8px;
+            overflow: hidden;
+            max-width: 400px;
+            margin: 0 auto;
+        }
+
+        .panel-header {
+            background: #6366f1;
+            color: white;
+            padding: 16px;
+            text-align: center;
+        }
+
+        .panel-header h3 {
+            margin: 0;
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .panel-content {
+            padding: 20px;
+        }
+
+        .tab-buttons {
+            display: flex;
+            margin-bottom: 16px;
+            border-radius: 6px;
+            overflow: hidden;
+            border: 1px solid #e5e7eb;
+        }
+
+        .tab-button {
+            flex: 1;
+            padding: 8px 12px;
+            border: none;
+            background: #f9fafb;
+            color: #6b7280;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .tab-button.active {
+            background: #6366f1;
+            color: white;
+        }
+
+        .input-area {
+            display: none;
+            margin-bottom: 16px;
+        }
+
+        .input-area.active {
+            display: block;
+        }
+
+        .input-area label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            color: #374151;
+            margin-bottom: 6px;
+        }
+
+        .input-area textarea,
+        .input-area input[type="text"],
+        .input-area input[type="password"] {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 14px;
+            font-family: inherit;
+            resize: vertical;
+            box-sizing: border-box;
+        }
+
+        .generate-button {
+            width: 100%;
+            padding: 12px 16px;
+            background: #10b981;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .generate-button:disabled {
+            background: #d1d5db;
+            cursor: not-allowed;
+        }
+
+        .status-section {
+            margin-top: 16px;
+            min-height: 24px;
+        }
+
+        .loading { color: #6366f1; font-size: 14px; font-weight: 500; }
+        .success { color: #10b981; font-size: 14px; font-weight: 500; }
+        .error { color: #ef4444; font-size: 14px; font-weight: 500; }
+    </style>
+</head>
+<body>
+    <div class="ai-layout-panel">
+        <div class="panel-header">
+            <h3>AI Layout Generator (ChatGPT)</h3>
+        </div>
+        <div class="panel-content">
+            <div class="input-section">
+                <div class="tab-buttons">
+                    <button id="prompt-tab" class="tab-button active">Text Prompt</button>
+                    <button id="screenshot-tab" class="tab-button">Screenshot</button>
+                </div>
+
+                <div id="prompt-input" class="input-area active">
+                    <label for="layout-prompt">Describe your layout:</label>
+                    <textarea id="layout-prompt" placeholder="E.g., Create a hero section with a large heading, subtitle, and call-to-action button" rows="4"></textarea>
+                </div>
+
+                <div id="screenshot-input" class="input-area">
+                    <label for="screenshot-file">Upload screenshot:</label>
+                    <input type="file" id="screenshot-file" accept="image/*" />
+                    <div id="screenshot-preview"></div>
+                </div>
+
+                <div style="margin: 16px 0; padding: 16px; background: #f9fafb; border-radius: 6px; border: 1px solid #e5e7eb;">
+                    <label for="openai-api-key">OpenAI API Key:</label>
+                    <input type="password" id="openai-api-key" placeholder="Your OpenAI API key (sk-...)" style="margin-top: 6px;"/>
+                    <small style="display: block; font-size: 12px; color: #6b7280; margin-top: 6px;">Get your API key from <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com/api-keys</a></small>
+                </div>
+
+                <button id="generate-layout" class="generate-button" disabled>Generate Layout</button>
+            </div>
+
+            <div id="status" class="status-section"></div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script>
+        // Simple plugin implementation that works in iframe
+        class SimpleAIPlugin {
+            constructor() {
+                this.screenshotData = null;
+                this.init();
+            }
+
+            init() {
+                console.log('Initializing simple AI plugin...');
+                this.setupEventListeners();
+
+                // Load saved API key
+                const savedApiKey = localStorage.getItem('openai-api-key');
+                if (savedApiKey) {
+                    document.getElementById('openai-api-key').value = savedApiKey;
+                    this.updateGenerateButton();
+                }
+            }
+
+            setupEventListeners() {
+                const promptTab = document.getElementById('prompt-tab');
+                const screenshotTab = document.getElementById('screenshot-tab');
+                const promptInput = document.getElementById('prompt-input');
+                const screenshotInput = document.getElementById('screenshot-input');
+                const generateButton = document.getElementById('generate-layout');
+                const apiKeyInput = document.getElementById('openai-api-key');
+                const layoutPrompt = document.getElementById('layout-prompt');
+                const screenshotFile = document.getElementById('screenshot-file');
+
+                promptTab.addEventListener('click', () => {
+                    promptTab.classList.add('active');
+                    screenshotTab.classList.remove('active');
+                    promptInput.classList.add('active');
+                    screenshotInput.classList.remove('active');
+                    this.updateGenerateButton();
+                });
+
+                screenshotTab.addEventListener('click', () => {
+                    screenshotTab.classList.add('active');
+                    promptTab.classList.remove('active');
+                    screenshotInput.classList.add('active');
+                    promptInput.classList.remove('active');
+                    this.updateGenerateButton();
+                });
+
+                apiKeyInput.addEventListener('input', () => {
+                    localStorage.setItem('openai-api-key', apiKeyInput.value);
+                    this.updateGenerateButton();
+                });
+
+                layoutPrompt.addEventListener('input', () => {
+                    this.updateGenerateButton();
+                });
+
+                screenshotFile.addEventListener('change', (e) => {
+                    const file = e.target.files[0];
+                    if (file) {
+                        this.handleScreenshotUpload(file);
+                    } else {
+                        this.screenshotData = null;
+                        document.getElementById('screenshot-preview').innerHTML = '';
+                    }
+                    this.updateGenerateButton();
+                });
+
+                generateButton.addEventListener('click', () => {
+                    this.generateLayout();
+                });
+            }
+
+            updateGenerateButton() {
+                const generateButton = document.getElementById('generate-layout');
+                const apiKey = document.getElementById('openai-api-key').value;
+                const hasPrompt = document.getElementById('layout-prompt').value.trim();
+                const hasScreenshot = this.screenshotData !== null;
+                const promptTab = document.getElementById('prompt-tab').classList.contains('active');
+
+                // Debug logging
+                console.log('Button update check:', {
+                    apiKey: apiKey ? `${apiKey.substring(0, 10)}...` : 'empty',
+                    hasPrompt,
+                    hasScreenshot,
+                    promptTab,
+                    screenshotData: this.screenshotData ? 'exists' : 'null'
+                });
+
+                // Validate API key format (OpenAI keys start with sk-)
+                const isValidKey = apiKey.startsWith('sk-') && apiKey.length > 20;
+                const status = document.getElementById('status');
+
+                if (apiKey && !isValidKey) {
+                    status.innerHTML = '<div class="error">Invalid API key format. Should start with "sk-"</div>';
+                } else if (isValidKey && ((promptTab && hasPrompt) || (!promptTab && hasScreenshot))) {
+                    status.innerHTML = '';
+                }
+
+                const canGenerate = isValidKey && ((promptTab && hasPrompt) || (!promptTab && hasScreenshot));
+                console.log('Can generate:', canGenerate, 'Valid key:', isValidKey);
+                generateButton.disabled = !canGenerate;
+            }
+
+            handleScreenshotUpload(file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const preview = document.getElementById('screenshot-preview');
+                    preview.innerHTML = `
+                        <img src="${e.target.result}" alt="Screenshot preview" style="max-width: 100%; height: auto; border-radius: 4px; margin-top: 8px;">
+                    `;
+                    this.screenshotData = e.target.result;
+                    console.log('Screenshot uploaded and stored');
+                    // Update button after screenshot is loaded
+                    this.updateGenerateButton();
+                };
+                reader.readAsDataURL(file);
+            }
+
+            async generateLayout() {
+                const status = document.getElementById('status');
+                const generateButton = document.getElementById('generate-layout');
+
+                try {
+                    generateButton.disabled = true;
+                    status.innerHTML = '<div class="loading">Generating layout...</div>';
+
+                    const apiKey = document.getElementById('openai-api-key').value;
+                    const promptTab = document.getElementById('prompt-tab').classList.contains('active');
+
+                    // Use proxy server to avoid CORS issues
+                    const proxyUrl = window.location.hostname === 'localhost'
+                        ? 'http://localhost:3001/api/openai'
+                        : 'https://YOUR_VERCEL_URL.vercel.app/api/openai';
+
+                    let messages = [{
+                        role: 'system',
+                        content: 'You are an expert web designer who creates modern, responsive layouts. Always respond with valid JSON containing "html" and "css" properties.'
+                    }];
+
+                    if (promptTab) {
+                        // Text prompt mode
+                        const prompt = document.getElementById('layout-prompt').value;
+                        messages.push({
+                            role: 'user',
+                            content: `Create a modern webpage layout for: ${prompt}
+
+Return your response as JSON with 'html' and 'css' properties containing:
+- Clean, semantic HTML structure
+- Modern CSS styles with flexbox/grid
+- Responsive design principles
+- Professional color scheme and typography
+
+Example format:
+{
+  "html": "<div class='container'>...</div>",
+  "css": ".container { ... }"
+}`
+                        });
+                    } else {
+                        // Screenshot mode - use vision model
+                        if (!this.screenshotData) {
+                            throw new Error('No screenshot uploaded');
+                        }
+
+                        // Extract base64 data and mime type
+                        const base64Data = this.screenshotData.split(',')[1];
+                        const mimeType = this.screenshotData.split(';')[0].split(':')[1];
+
+                        messages.push({
+                            role: 'user',
+                            content: [
+                                {
+                                    type: 'text',
+                                    text: `Analyze this screenshot and create a similar modern webpage layout. Return your response as JSON with 'html' and 'css' properties containing:
+- Clean, semantic HTML structure that recreates the design
+- Modern CSS styles with flexbox/grid
+- Responsive design principles
+- Professional color scheme and typography similar to the image
+
+Example format:
+{
+  "html": "<div class='container'>...</div>",
+  "css": ".container { ... }"
+}`
+                                },
+                                {
+                                    type: 'image_url',
+                                    image_url: {
+                                        url: this.screenshotData
+                                    }
+                                }
+                            ]
+                        });
+                    }
+
+                    const requestData = {
+                        apiKey: apiKey,
+                        model: promptTab ? 'gpt-4' : 'gpt-4o',
+                        max_tokens: 4000,
+                        messages: messages
+                    };
+
+                    const response = await axios.post(proxyUrl, requestData);
+
+                    status.innerHTML = '<div class="success">Layout generated! Check console for output.</div>';
+
+                    // Parse response
+                    let generatedContent = response.data.choices[0].message.content;
+                    console.log('Raw response:', generatedContent);
+
+                    // Try to parse JSON from response
+                    try {
+                        const jsonMatch = generatedContent.match(/\{[\s\S]*\}/);
+                        if (jsonMatch) {
+                            const layoutData = JSON.parse(jsonMatch[0]);
+                            console.log('Parsed layout data:', layoutData);
+                            status.innerHTML = '<div class="success">✅ Layout generated successfully!</div>';
+                        } else {
+                            console.log('No JSON found in response');
+                        }
+                    } catch (parseError) {
+                        console.log('Could not parse JSON, raw content:', generatedContent);
+                    }
+
+                } catch (error) {
+                    status.innerHTML = `<div class="error">Error: ${error.message}</div>`;
+                    console.error('Generation error:', error);
+                } finally {
+                    generateButton.disabled = false;
+                    this.updateGenerateButton();
+                }
+            }
+        }
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            new SimpleAIPlugin();
+        });
+    </script>
+</body>
+</html>
