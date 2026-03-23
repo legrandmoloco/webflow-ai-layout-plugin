@@ -428,14 +428,13 @@ Example format:
                         console.log('  - pathname:', window.location.pathname);
                         console.log('  - in iframe:', window.self !== window.top);
 
-                        // For localhost testing outside of Webflow Designer, show preview instead of error
-                        const isInWebflowDesigner = window.parent && window.parent !== window && (
-                            window.parent.location.hostname.includes('webflow.com') ||
-                            document.referrer.includes('webflow.com')
-                        );
+                        // For development/testing mode (when Webflow API is not available)
+                        const isInWebflowIframe = window.parent !== window;
+                        const isWebflowDomain = window.location.hostname.includes('vercel.app') || window.location.hostname === 'localhost';
 
-                        if (window.location.hostname === 'localhost' && !isInWebflowDesigner) {
-                            console.log('🚀 Running in localhost standalone mode - showing preview instead');
+                        if (isWebflowDomain) {
+                            console.log('🚀 Running in development mode - showing preview instead of creating actual elements');
+                            console.log('💡 To create actual Webflow elements, upload this plugin to Webflow and run in production mode');
                             this.createMockLayout(layoutData.html || 'Generated content preview');
                             return;
                         }
@@ -728,8 +727,12 @@ Example format:
                     status.innerHTML = `
                         <div class="success" style="text-align: left;">
                             ✅ Layout generated successfully!
-                            <div style="margin-top: 10px; font-size: 14px; color: #666;">
-                                <strong>Localhost Mode:</strong> Preview shown below. To create actual Webflow elements, use this plugin within Webflow Designer.
+                            <div style="margin-top: 10px; padding: 10px; background: #e3f2fd; border-radius: 4px; font-size: 14px; color: #1565c0;">
+                                <strong>🔧 Development Preview Mode</strong><br>
+                                This is a preview of the generated layout. To create actual Webflow elements:<br>
+                                <strong>1.</strong> Copy the files from the <code>dist/</code> folder<br>
+                                <strong>2.</strong> Upload them to your Webflow app in production<br>
+                                <strong>3.</strong> The Webflow API will then be available for element creation
                             </div>
                         </div>
                     `;
@@ -855,25 +858,18 @@ Example format:
         function initializePlugin() {
             console.log('🚀 Initializing plugin...');
 
-            // Debug current environment thoroughly
-            console.log('🔍 Comprehensive environment debug:');
+            // Debug current environment (safe cross-origin checks)
+            console.log('🔍 Environment debug:');
             console.log('  - window.webflow:', typeof window.webflow);
-            console.log('  - window.parent.webflow:', window.parent !== window ? typeof window.parent.webflow : 'N/A');
-            console.log('  - window.top.webflow:', window.top !== window ? typeof window.top.webflow : 'N/A');
-            console.log('  - window.parent:', window.parent !== window);
+            console.log('  - in iframe:', window.parent !== window);
             console.log('  - referrer:', document.referrer);
             console.log('  - location:', window.location.href);
             console.log('  - user agent contains Webflow:', navigator.userAgent.includes('Webflow'));
             console.log('  - available globals:', Object.keys(window).filter(k => k.toLowerCase().includes('web')));
 
-            // Set up iframe communication for Webflow API
+            // Note: Webflow API is only available when plugin is installed in production
             if (!window.webflow && window.parent !== window) {
-                console.log('🔗 Setting up iframe communication with Webflow Designer...');
-
-                // Create a proxy webflow object that uses postMessage
-                window.webflow = createWebflowProxy();
-
-                console.log('✅ Webflow proxy created for iframe communication');
+                console.log('📌 Running in iframe without Webflow API - using preview mode');
             }
 
             new SimpleAIPlugin();
