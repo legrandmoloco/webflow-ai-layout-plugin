@@ -4,8 +4,9 @@
   "version": "1.0.0",
   "description": "Generate page layouts using AI from screenshots or prompts",
   "author": "Your Name",
+  "homepage": "https://project-0w0hw.vercel.app",
   "main": "index.html",
-  "permissions": ["sites:read", "sites:write", "pages:write"],
+  "permissions": ["sites:read", "sites:write", "pages:read", "pages:write", "elements:read", "elements:write"],
   "devModeUrl": "http://localhost:8080",
   "oauth": {
     "redirectUri": "{{REDIRECT_URI}}",

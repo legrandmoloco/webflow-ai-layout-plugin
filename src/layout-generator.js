@@ -68,6 +68,8 @@ export class LayoutGenerator {
 
       let webflowElement;
 
+      // Use correct Webflow API elementBuilder pattern
+      let builder;
       switch (tagName) {
         case 'header':
         case 'nav':
@@ -76,7 +78,7 @@ export class LayoutGenerator {
         case 'article':
         case 'aside':
         case 'footer':
-          webflowElement = await this.webflowAPI.createElement('Section', webflowParent);
+          builder = this.webflowAPI.elementBuilder(this.webflowAPI.elementPresets.Section);
           break;
         case 'h1':
         case 'h2':
@@ -84,47 +86,50 @@ export class LayoutGenerator {
         case 'h4':
         case 'h5':
         case 'h6':
-          webflowElement = await this.webflowAPI.createElement('Heading', webflowParent);
+          builder = this.webflowAPI.elementBuilder(this.webflowAPI.elementPresets.Heading);
           break;
         case 'p':
-          webflowElement = await this.webflowAPI.createElement('Paragraph', webflowParent);
+          builder = this.webflowAPI.elementBuilder(this.webflowAPI.elementPresets.Paragraph);
           break;
         case 'a':
-          webflowElement = await this.webflowAPI.createElement('Link', webflowParent);
+          builder = this.webflowAPI.elementBuilder(this.webflowAPI.elementPresets.Link);
           break;
         case 'img':
-          webflowElement = await this.webflowAPI.createElement('Image', webflowParent);
+          builder = this.webflowAPI.elementBuilder(this.webflowAPI.elementPresets.Image);
           break;
         case 'button':
-          webflowElement = await this.webflowAPI.createElement('Button', webflowParent);
+          builder = this.webflowAPI.elementBuilder(this.webflowAPI.elementPresets.Button);
           break;
         case 'form':
-          webflowElement = await this.webflowAPI.createElement('Form', webflowParent);
+          builder = this.webflowAPI.elementBuilder(this.webflowAPI.elementPresets.Form);
           break;
         case 'input':
-          webflowElement = await this.webflowAPI.createElement('Input', webflowParent);
+          builder = this.webflowAPI.elementBuilder(this.webflowAPI.elementPresets.Input);
           break;
         case 'textarea':
-          webflowElement = await this.webflowAPI.createElement('Textarea', webflowParent);
+          builder = this.webflowAPI.elementBuilder(this.webflowAPI.elementPresets.Textarea);
           break;
         case 'ul':
         case 'ol':
-          webflowElement = await this.webflowAPI.createElement('List', webflowParent);
+          builder = this.webflowAPI.elementBuilder(this.webflowAPI.elementPresets.List);
           break;
         case 'li':
-          webflowElement = await this.webflowAPI.createElement('ListItem', webflowParent);
+          builder = this.webflowAPI.elementBuilder(this.webflowAPI.elementPresets.ListItem);
           break;
         default:
-          webflowElement = await this.webflowAPI.createElement('Div', webflowParent);
+          builder = this.webflowAPI.elementBuilder(this.webflowAPI.elementPresets.DivBlock);
           break;
       }
+
+      webflowElement = await builder.build();
+      await webflowParent.appendChild(webflowElement);
 
       if (domElement.className) {
         await this.setElementClasses(webflowElement, domElement.className);
       }
 
       if (domElement.textContent && domElement.children.length === 0) {
-        await this.webflowAPI.setTextContent(webflowElement, domElement.textContent.trim());
+        await webflowElement.setTextContent(domElement.textContent.trim());
       }
 
       await this.setElementAttributes(webflowElement, domElement, tagName);
@@ -133,8 +138,10 @@ export class LayoutGenerator {
         if (childNode.nodeType === Node.ELEMENT_NODE) {
           await this.createWebflowElements(childNode, webflowElement);
         } else if (childNode.nodeType === Node.TEXT_NODE && childNode.textContent.trim()) {
-          const textDiv = await this.webflowAPI.createElement('Div', webflowElement);
-          await this.webflowAPI.setTextContent(textDiv, childNode.textContent.trim());
+          const textBuilder = this.webflowAPI.elementBuilder(this.webflowAPI.elementPresets.DivBlock);
+          const textDiv = await textBuilder.build();
+          await webflowElement.appendChild(textDiv);
+          await textDiv.setTextContent(childNode.textContent.trim());
         }
       }
 
@@ -142,8 +149,10 @@ export class LayoutGenerator {
 
     } catch (error) {
       console.error('Error creating Webflow element:', error);
-      const fallbackDiv = await this.webflowAPI.createElement('Div', webflowParent);
-      await this.webflowAPI.setTextContent(fallbackDiv, 'Error creating element');
+      const fallbackBuilder = this.webflowAPI.elementBuilder(this.webflowAPI.elementPresets.DivBlock);
+      const fallbackDiv = await fallbackBuilder.build();
+      await webflowParent.appendChild(fallbackDiv);
+      await fallbackDiv.setTextContent('Error creating element');
       return fallbackDiv;
     }
   }
@@ -155,7 +164,7 @@ export class LayoutGenerator {
       for (const className of classes) {
         const trimmedClass = className.trim();
         if (trimmedClass) {
-          await this.webflowAPI.addClassToElement(webflowElement, trimmedClass);
+          await webflowElement.setClass(trimmedClass);
         }
       }
     } catch (error) {
@@ -168,46 +177,46 @@ export class LayoutGenerator {
       switch (tagName) {
         case 'img':
           if (domElement.src) {
-            await this.webflowAPI.setElementAttribute(webflowElement, 'src', domElement.src);
+            await webflowElement.setAttribute('src', domElement.src);
           }
           if (domElement.alt) {
-            await this.webflowAPI.setElementAttribute(webflowElement, 'alt', domElement.alt);
+            await webflowElement.setAttribute('alt', domElement.alt);
           }
           break;
 
         case 'a':
           if (domElement.href) {
-            await this.webflowAPI.setElementAttribute(webflowElement, 'href', domElement.href);
+            await webflowElement.setAttribute('href', domElement.href);
           }
           if (domElement.target) {
-            await this.webflowAPI.setElementAttribute(webflowElement, 'target', domElement.target);
+            await webflowElement.setAttribute('target', domElement.target);
           }
           break;
 
         case 'input':
           if (domElement.type) {
-            await this.webflowAPI.setElementAttribute(webflowElement, 'type', domElement.type);
+            await webflowElement.setAttribute('type', domElement.type);
           }
           if (domElement.placeholder) {
-            await this.webflowAPI.setElementAttribute(webflowElement, 'placeholder', domElement.placeholder);
+            await webflowElement.setAttribute('placeholder', domElement.placeholder);
           }
           if (domElement.name) {
-            await this.webflowAPI.setElementAttribute(webflowElement, 'name', domElement.name);
+            await webflowElement.setAttribute('name', domElement.name);
           }
           break;
 
         case 'textarea':
           if (domElement.placeholder) {
-            await this.webflowAPI.setElementAttribute(webflowElement, 'placeholder', domElement.placeholder);
+            await webflowElement.setAttribute('placeholder', domElement.placeholder);
           }
           if (domElement.name) {
-            await this.webflowAPI.setElementAttribute(webflowElement, 'name', domElement.name);
+            await webflowElement.setAttribute('name', domElement.name);
           }
           break;
       }
 
       if (domElement.id) {
-        await this.webflowAPI.setElementAttribute(webflowElement, 'id', domElement.id);
+        await webflowElement.setAttribute('id', domElement.id);
       }
 
     } catch (error) {
@@ -221,7 +230,7 @@ export class LayoutGenerator {
 
       for (const breakpoint of breakpoints) {
         if (styles[breakpoint]) {
-          await this.webflowAPI.setElementStyles(element, styles[breakpoint], breakpoint);
+          await element.setStyles(styles[breakpoint]);
         }
       }
     } catch (error) {

@@ -288,7 +288,7 @@
                     // Use proxy server to avoid CORS issues
                     const proxyUrl = window.location.hostname === 'localhost'
                         ? 'http://localhost:3001/api/openai'
-                        : 'https://YOUR_VERCEL_URL.vercel.app/api/openai';
+                        : 'https://project-0w0hw.vercel.app/api/openai';
 
                     let messages = [{
                         role: 'system',
@@ -372,12 +372,21 @@ Example format:
                         if (jsonMatch) {
                             const layoutData = JSON.parse(jsonMatch[0]);
                             console.log('Parsed layout data:', layoutData);
-                            status.innerHTML = '<div class="success">✅ Layout generated successfully!</div>';
+
+                            // Create elements in Webflow
+                            await this.createWebflowLayout(layoutData);
+                            status.innerHTML = '<div class="success">✅ Layout created in Webflow!</div>';
                         } else {
                             console.log('No JSON found in response');
+                            // Try to create from raw HTML if no JSON
+                            await this.createFromRawHTML(generatedContent);
+                            status.innerHTML = '<div class="success">✅ Layout created from raw HTML!</div>';
                         }
                     } catch (parseError) {
-                        console.log('Could not parse JSON, raw content:', generatedContent);
+                        console.log('Could not parse JSON, trying raw content:', generatedContent);
+                        // Fallback to raw content
+                        await this.createFromRawHTML(generatedContent);
+                        status.innerHTML = '<div class="success">✅ Layout created from raw content!</div>';
                     }
 
                 } catch (error) {
@@ -388,12 +397,540 @@ Example format:
                     this.updateGenerateButton();
                 }
             }
+
+            async createWebflowLayout(layoutData) {
+                console.log('Creating Webflow layout:', layoutData);
+
+                try {
+                    // Enhanced debugging - check what's available in the global scope
+                    console.log('🔍 Debug - Available globals:', Object.keys(window).filter(key => key.toLowerCase().includes('web') || key.toLowerCase().includes('flow')));
+                    console.log('🔍 Debug - webflow type:', typeof webflow);
+                    console.log('🔍 Debug - window.webflow type:', typeof window.webflow);
+                    console.log('🔍 Debug - Current domain:', window.location.hostname);
+                    console.log('🔍 Debug - User agent:', navigator.userAgent.substring(0, 100));
+
+                    if (typeof webflow !== 'undefined') {
+                        console.log('✅ Webflow object found:', webflow);
+                        console.log('✅ Webflow methods available:', Object.keys(webflow));
+                        console.log('✅ elementBuilder available:', typeof webflow.elementBuilder);
+                        console.log('✅ elementPresets available:', typeof webflow.elementPresets);
+                        if (webflow.elementPresets) {
+                            console.log('✅ Available presets:', Object.keys(webflow.elementPresets));
+                        }
+                    }
+
+                    // Check if webflow API is available
+                    if (typeof webflow === 'undefined') {
+                        console.error('❌ Webflow API not available');
+                        console.log('📍 Current environment check:');
+                        console.log('  - hostname:', window.location.hostname);
+                        console.log('  - protocol:', window.location.protocol);
+                        console.log('  - pathname:', window.location.pathname);
+                        console.log('  - in iframe:', window.self !== window.top);
+
+                        // For localhost testing outside of Webflow Designer, show preview instead of error
+                        const isInWebflowDesigner = window.parent && window.parent !== window && (
+                            window.parent.location.hostname.includes('webflow.com') ||
+                            document.referrer.includes('webflow.com')
+                        );
+
+                        if (window.location.hostname === 'localhost' && !isInWebflowDesigner) {
+                            console.log('🚀 Running in localhost standalone mode - showing preview instead');
+                            this.createMockLayout(layoutData.html || 'Generated content preview');
+                            return;
+                        }
+
+                        throw new Error('Webflow API not available. Make sure you are running this in Webflow Designer.');
+                    }
+
+                    // Parse HTML and create elements
+                    if (layoutData.html) {
+                        await this.parseAndCreateElements(layoutData.html, layoutData.css);
+                    } else {
+                        throw new Error('No HTML found in layout data');
+                    }
+
+                } catch (error) {
+                    console.error('Error creating Webflow layout:', error);
+                    throw error;
+                }
+            }
+
+            async parseAndCreateElements(htmlString, cssString) {
+                try {
+                    // Check if we have access to Webflow API
+                    if (typeof webflow === 'undefined') {
+                        console.warn('Webflow API not available, creating mock elements');
+                        this.createMockLayout(htmlString);
+                        return;
+                    }
+
+                    // Get current body element to add our content to
+                    const bodyElement = await webflow.getBodyElement();
+                    console.log('Got body element:', bodyElement);
+
+                    // Create a container div using the correct Webflow API
+                    const containerBuilder = webflow.elementBuilder(webflow.elementPresets.DivBlock);
+                    const containerElement = await containerBuilder.build();
+
+                    // Add container to body
+                    await bodyElement.appendChild(containerElement);
+
+                    // Set styles on container
+                    await containerElement.setStyles({
+                        'display': 'flex',
+                        'flex-direction': 'column',
+                        'width': '100%',
+                        'min-height': '400px',
+                        'padding': '20px',
+                        'background-color': '#f8f9fa',
+                        'border': '2px solid #007bff',
+                        'border-radius': '8px',
+                        'margin': '20px 0'
+                    });
+
+                    // Parse HTML to extract structure
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(`<div>${htmlString}</div>`, 'text/html');
+                    const rootElement = doc.body.firstChild;
+
+                    // Create Webflow elements from parsed HTML
+                    await this.createWebflowElementsFromDOM(rootElement, containerElement);
+
+                    // Apply CSS styles if provided
+                    if (cssString) {
+                        await this.applyCSSStyles(cssString);
+                    }
+
+                    console.log('✅ Layout created successfully in Webflow!');
+
+                } catch (error) {
+                    console.error('Error parsing and creating elements:', error);
+                    throw error;
+                }
+            }
+
+            async createWebflowElementsFromDOM(domElement, parentWebflowElement) {
+                if (!domElement || domElement.nodeType !== Node.ELEMENT_NODE) {
+                    return;
+                }
+
+                const tagName = domElement.tagName.toLowerCase();
+                let webflowElement;
+
+                try {
+                    // Map HTML tags to Webflow elements using correct API
+                    let builder;
+                    switch (tagName) {
+                        case 'header':
+                        case 'nav':
+                        case 'section':
+                        case 'footer':
+                        case 'div':
+                            builder = webflow.elementBuilder(webflow.elementPresets.DivBlock);
+                            break;
+                        case 'h1':
+                        case 'h2':
+                        case 'h3':
+                        case 'h4':
+                        case 'h5':
+                        case 'h6':
+                            builder = webflow.elementBuilder(webflow.elementPresets.Heading);
+                            break;
+                        case 'p':
+                            builder = webflow.elementBuilder(webflow.elementPresets.Paragraph);
+                            break;
+                        case 'a':
+                            builder = webflow.elementBuilder(webflow.elementPresets.Link);
+                            break;
+                        case 'img':
+                            builder = webflow.elementBuilder(webflow.elementPresets.Image);
+                            break;
+                        case 'button':
+                            builder = webflow.elementBuilder(webflow.elementPresets.Button);
+                            break;
+                        default:
+                            builder = webflow.elementBuilder(webflow.elementPresets.DivBlock);
+                            break;
+                    }
+
+                    webflowElement = await builder.build();
+                    await parentWebflowElement.appendChild(webflowElement);
+
+                    // Set text content if element has text
+                    if (domElement.textContent && domElement.children.length === 0) {
+                        const textContent = domElement.textContent.trim();
+                        if (textContent) {
+                            await webflowElement.setTextContent(textContent);
+                        }
+                    }
+
+                    // Apply basic styles based on tag
+                    await this.applyBasicStyles(webflowElement, tagName, domElement);
+
+                    // Recursively create child elements
+                    for (const child of domElement.children) {
+                        await this.createWebflowElementsFromDOM(child, webflowElement);
+                    }
+
+                } catch (error) {
+                    console.error(`Error creating element for tag ${tagName}:`, error);
+                    // Create a fallback div if specific element creation fails
+                    try {
+                        const fallbackBuilder = webflow.elementBuilder(webflow.elementPresets.DivBlock);
+                        webflowElement = await fallbackBuilder.build();
+                        await parentWebflowElement.appendChild(webflowElement);
+                        if (domElement.textContent) {
+                            await webflowElement.setTextContent(domElement.textContent.trim());
+                        }
+                    } catch (fallbackError) {
+                        console.error('Even fallback element creation failed:', fallbackError);
+                    }
+                }
+            }
+
+            async applyBasicStyles(webflowElement, tagName, domElement) {
+                try {
+                    const styles = {};
+
+                    // Apply basic styles based on element type
+                    switch (tagName) {
+                        case 'header':
+                            styles['display'] = 'flex';
+                            styles['justify-content'] = 'space-between';
+                            styles['align-items'] = 'center';
+                            styles['padding'] = '20px';
+                            styles['background-color'] = '#ffffff';
+                            styles['border-bottom'] = '1px solid #e5e5e5';
+                            break;
+                        case 'nav':
+                            styles['display'] = 'flex';
+                            styles['gap'] = '20px';
+                            break;
+                        case 'section':
+                            styles['padding'] = '40px 20px';
+                            styles['width'] = '100%';
+                            break;
+                        case 'h1':
+                            styles['font-size'] = '48px';
+                            styles['font-weight'] = 'bold';
+                            styles['margin-bottom'] = '20px';
+                            break;
+                        case 'h2':
+                            styles['font-size'] = '36px';
+                            styles['font-weight'] = 'bold';
+                            styles['margin-bottom'] = '16px';
+                            break;
+                        case 'h3':
+                            styles['font-size'] = '24px';
+                            styles['font-weight'] = 'bold';
+                            styles['margin-bottom'] = '12px';
+                            break;
+                        case 'p':
+                            styles['font-size'] = '16px';
+                            styles['line-height'] = '1.6';
+                            styles['margin-bottom'] = '16px';
+                            break;
+                        case 'button':
+                            styles['padding'] = '12px 24px';
+                            styles['background-color'] = '#007bff';
+                            styles['color'] = '#ffffff';
+                            styles['border'] = 'none';
+                            styles['border-radius'] = '4px';
+                            styles['cursor'] = 'pointer';
+                            break;
+                        case 'footer':
+                            styles['margin-top'] = 'auto';
+                            styles['padding'] = '40px 20px';
+                            styles['background-color'] = '#f8f9fa';
+                            styles['text-align'] = 'center';
+                            break;
+                    }
+
+                    // Apply class-based styles if available
+                    if (domElement.className) {
+                        const classes = domElement.className.split(' ');
+                        for (const className of classes) {
+                            if (className.includes('hero')) {
+                                styles['text-align'] = 'center';
+                                styles['padding'] = '80px 20px';
+                                styles['background-color'] = '#f8f9fa';
+                            }
+                            if (className.includes('container')) {
+                                styles['max-width'] = '1200px';
+                                styles['margin'] = '0 auto';
+                            }
+                        }
+                    }
+
+                    if (Object.keys(styles).length > 0) {
+                        await webflowElement.setStyles(styles);
+                    }
+
+                } catch (error) {
+                    console.warn('Error applying styles:', error);
+                }
+            }
+
+            async applyCSSStyles(cssString) {
+                try {
+                    console.log('Applying CSS styles:', cssString.substring(0, 200) + '...');
+                    // Note: Webflow doesn't support direct CSS injection
+                    // This is a placeholder for future CSS parsing implementation
+                } catch (error) {
+                    console.warn('Error applying CSS styles:', error);
+                }
+            }
+
+            createMockLayout(htmlString) {
+                try {
+                    console.log('Creating mock layout preview (Webflow API not available)');
+
+                    // Create a visual representation in the plugin interface
+                    const status = document.getElementById('status');
+
+                    // Create a styled preview container
+                    const previewContainer = document.createElement('div');
+                    previewContainer.style.cssText = `
+                        margin-top: 20px;
+                        padding: 20px;
+                        border: 2px solid #007bff;
+                        border-radius: 8px;
+                        background: #f8f9fa;
+                        max-height: 400px;
+                        overflow-y: auto;
+                    `;
+
+                    // Try to render the HTML if it's valid, otherwise show as code
+                    try {
+                        const tempDiv = document.createElement('div');
+                        tempDiv.innerHTML = htmlString;
+
+                        // If HTML is valid, create a styled preview
+                        previewContainer.innerHTML = `
+                            <h4 style="margin: 0 0 15px 0; color: #007bff; font-size: 16px;">🎨 Generated Layout Preview:</h4>
+                            <div style="border: 1px solid #ccc; padding: 15px; background: white; border-radius: 4px; margin-bottom: 15px;">
+                                ${htmlString}
+                            </div>
+                            <details style="margin-top: 10px;">
+                                <summary style="cursor: pointer; color: #666; font-size: 14px;">View HTML Code</summary>
+                                <pre style="background: #f1f1f1; padding: 10px; border-radius: 4px; font-size: 12px; margin-top: 8px; white-space: pre-wrap;">${htmlString}</pre>
+                            </details>
+                        `;
+                    } catch (e) {
+                        // Fallback to code display if HTML is malformed
+                        previewContainer.innerHTML = `
+                            <h4 style="margin: 0 0 15px 0; color: #007bff;">Generated Content:</h4>
+                            <pre style="background: #f1f1f1; padding: 15px; border-radius: 4px; font-size: 12px; white-space: pre-wrap; max-height: 300px; overflow-y: auto;">${htmlString}</pre>
+                        `;
+                    }
+
+                    status.innerHTML = `
+                        <div class="success" style="text-align: left;">
+                            ✅ Layout generated successfully!
+                            <div style="margin-top: 10px; font-size: 14px; color: #666;">
+                                <strong>Localhost Mode:</strong> Preview shown below. To create actual Webflow elements, use this plugin within Webflow Designer.
+                            </div>
+                        </div>
+                    `;
+
+                    status.appendChild(previewContainer);
+
+                } catch (error) {
+                    console.error('Error creating mock layout:', error);
+                    const status = document.getElementById('status');
+                    status.innerHTML = `
+                        <div class="error">
+                            Error creating preview: ${error.message}
+                        </div>
+                    `;
+                }
+            }
+
+            async createFromRawHTML(content) {
+                try {
+                    // Extract HTML from markdown code blocks or raw content
+                    let htmlMatch = content.match(/```html\n([\s\S]*?)\n```/);
+                    if (!htmlMatch) {
+                        htmlMatch = content.match(/<[^>]+>[\s\S]*<\/[^>]+>/);
+                    }
+
+                    if (htmlMatch) {
+                        const htmlContent = htmlMatch[1] || htmlMatch[0];
+                        await this.parseAndCreateElements(htmlContent, '');
+                    } else {
+                        // Create a simple text element with the content
+                        const bodyElement = await webflow.getBodyElement();
+                        const textBuilder = webflow.elementBuilder(webflow.elementPresets.Paragraph);
+                        const textElement = await textBuilder.build();
+                        await bodyElement.appendChild(textElement);
+                        await textElement.setTextContent('AI Generated Content: ' + content.substring(0, 200) + '...');
+                    }
+
+                } catch (error) {
+                    console.error('Error creating from raw HTML:', error);
+                    throw error;
+                }
+            }
         }
 
-        // Initialize when page loads
-        document.addEventListener('DOMContentLoaded', () => {
+        // Create a proxy webflow object that communicates with parent frame via postMessage
+        function createWebflowProxy() {
+            console.log('🔧 Creating Webflow proxy for iframe communication...');
+
+            let messageId = 0;
+            const pendingMessages = new Map();
+
+            // Listen for responses from parent frame
+            window.addEventListener('message', (event) => {
+                if (event.data && event.data.type === 'webflow-response') {
+                    const { id, result, error } = event.data;
+                    if (pendingMessages.has(id)) {
+                        const { resolve, reject } = pendingMessages.get(id);
+                        pendingMessages.delete(id);
+
+                        if (error) {
+                            reject(new Error(error));
+                        } else {
+                            resolve(result);
+                        }
+                    }
+                }
+            });
+
+            // Send message to parent frame and wait for response
+            function sendMessage(method, args = []) {
+                return new Promise((resolve, reject) => {
+                    const id = ++messageId;
+                    const timeout = setTimeout(() => {
+                        pendingMessages.delete(id);
+                        reject(new Error(`Webflow API call timeout: ${method}`));
+                    }, 10000);
+
+                    pendingMessages.set(id, { resolve, reject });
+
+                    const message = {
+                        type: 'webflow-api-call',
+                        id,
+                        method,
+                        args
+                    };
+
+                    console.log('📡 Sending webflow API call:', message);
+                    window.parent.postMessage(message, '*');
+                });
+            }
+
+            // Create proxy object with common Webflow API methods
+            return {
+                // Element creation methods
+                getBodyElement: () => sendMessage('getBodyElement'),
+
+                elementBuilder: (preset) => ({
+                    build: () => sendMessage('elementBuilder.build', [preset])
+                }),
+
+                elementPresets: {
+                    DivBlock: 'DivBlock',
+                    Section: 'Section',
+                    Heading: 'Heading',
+                    Paragraph: 'Paragraph',
+                    Link: 'Link',
+                    Image: 'Image',
+                    Button: 'Button',
+                    Form: 'Form',
+                    Input: 'Input',
+                    Textarea: 'Textarea',
+                    List: 'List',
+                    ListItem: 'ListItem'
+                },
+
+                // Utility methods
+                getCurrentPage: () => sendMessage('getCurrentPage'),
+                selectElement: (element) => sendMessage('selectElement', [element])
+            };
+        }
+
+        // Webflow plugin initialization - try multiple methods
+        function initializePlugin() {
+            console.log('🚀 Initializing plugin...');
+
+            // Debug current environment thoroughly
+            console.log('🔍 Comprehensive environment debug:');
+            console.log('  - window.webflow:', typeof window.webflow);
+            console.log('  - window.parent.webflow:', window.parent !== window ? typeof window.parent.webflow : 'N/A');
+            console.log('  - window.top.webflow:', window.top !== window ? typeof window.top.webflow : 'N/A');
+            console.log('  - window.parent:', window.parent !== window);
+            console.log('  - referrer:', document.referrer);
+            console.log('  - location:', window.location.href);
+            console.log('  - user agent contains Webflow:', navigator.userAgent.includes('Webflow'));
+            console.log('  - available globals:', Object.keys(window).filter(k => k.toLowerCase().includes('web')));
+
+            // Set up iframe communication for Webflow API
+            if (!window.webflow && window.parent !== window) {
+                console.log('🔗 Setting up iframe communication with Webflow Designer...');
+
+                // Create a proxy webflow object that uses postMessage
+                window.webflow = createWebflowProxy();
+
+                console.log('✅ Webflow proxy created for iframe communication');
+            }
+
             new SimpleAIPlugin();
-        });
+        }
+
+        // Try multiple initialization approaches
+
+        // Method 1: Standard webflow.ready() callback
+        if (typeof webflow !== 'undefined' && webflow.ready) {
+            console.log('📡 Using webflow.ready() callback');
+            webflow.ready(() => {
+                console.log('✅ webflow.ready() fired');
+                initializePlugin();
+            });
+        }
+        // Method 2: Wait for DOM + manual check
+        else {
+            console.log('📄 Using DOM + manual Webflow check');
+            document.addEventListener('DOMContentLoaded', () => {
+                console.log('📄 DOM loaded');
+
+                // Try immediate initialization
+                if (typeof webflow !== 'undefined') {
+                    console.log('✅ Webflow found immediately');
+                    initializePlugin();
+                    return;
+                }
+
+                // Wait with polling
+                console.log('🔄 Polling for Webflow API...');
+                let attempts = 0;
+                const maxAttempts = 50; // 5 seconds timeout
+
+                const checkWebflow = () => {
+                    attempts++;
+                    console.log(`🔍 Attempt ${attempts}/${maxAttempts} - webflow:`, typeof window.webflow);
+
+                    if (typeof window.webflow !== 'undefined') {
+                        console.log('✅ Webflow API found!');
+                        initializePlugin();
+                    } else if (attempts >= maxAttempts) {
+                        console.log('⏰ Timeout - initializing without Webflow API');
+                        initializePlugin();
+                    } else {
+                        setTimeout(checkWebflow, 100);
+                    }
+                };
+
+                checkWebflow();
+            });
+        }
+
+        // Method 3: Fallback - initialize immediately if webflow is already available
+        if (typeof webflow !== 'undefined') {
+            console.log('⚡ Webflow already available, initializing immediately');
+            initializePlugin();
+        }
     </script>
 </body>
 </html>
