@@ -880,11 +880,32 @@ Example format:
 
         // Listen for potential Webflow API messages
         window.addEventListener('message', (event) => {
-            console.log('📨 Received message:', event);
-            if (event.data && typeof event.data === 'object') {
-                console.log('📨 Message data:', event.data);
+            console.log('📨 Received message:', {
+                origin: event.origin,
+                type: event.data?.type,
+                data: event.data
+            });
+
+            // Handle Webflow API initialization messages
+            if (event.data?.type === 'webflow-api-ready' || event.data?.webflow) {
+                console.log('✅ Webflow API message received:', event.data);
+                if (event.data.webflow) {
+                    window.webflow = event.data.webflow;
+                }
+                initializePlugin();
             }
         });
+
+        // Send initialization request to parent
+        const sendInitRequest = () => {
+            if (window.parent && window.parent !== window) {
+                console.log('📤 Sending API initialization request to parent');
+                window.parent.postMessage({
+                    type: 'webflow-extension-init',
+                    timestamp: Date.now()
+                }, '*');
+            }
+        };
 
         // Try multiple initialization approaches
 
@@ -896,11 +917,14 @@ Example format:
                 initializePlugin();
             });
         }
-        // Method 2: Wait for DOM + manual check
+        // Method 2: Wait for DOM + manual check + postMessage
         else {
-            console.log('📄 Using DOM + manual Webflow check');
+            console.log('📄 Using DOM + manual Webflow check + postMessage');
             document.addEventListener('DOMContentLoaded', () => {
                 console.log('📄 DOM loaded');
+
+                // Send initialization request to parent immediately
+                sendInitRequest();
 
                 // Try immediate initialization
                 if (typeof webflow !== 'undefined') {
@@ -909,7 +933,7 @@ Example format:
                     return;
                 }
 
-                // Wait with polling
+                // Wait with polling + additional postMessage requests
                 console.log('🔄 Polling for Webflow API...');
                 let attempts = 0;
                 const maxAttempts = 50; // 5 seconds timeout
@@ -917,6 +941,11 @@ Example format:
                 const checkWebflow = () => {
                     attempts++;
                     console.log(`🔍 Attempt ${attempts}/${maxAttempts} - webflow:`, typeof window.webflow);
+
+                    // Send additional init requests every 10 attempts
+                    if (attempts % 10 === 0) {
+                        sendInitRequest();
+                    }
 
                     // Check for different possible Webflow API patterns
                     const webflowAPI = window.webflow || window.Webflow || window.WebflowAPI;
@@ -931,6 +960,7 @@ Example format:
                         console.log('  - window.webflow:', window.webflow);
                         console.log('  - window.Webflow:', window.Webflow);
                         console.log('  - window.WebflowAPI:', window.WebflowAPI);
+                        console.log('  - all globals:', Object.keys(window).filter(k => k.toLowerCase().includes('webflow')));
                         initializePlugin();
                     } else {
                         setTimeout(checkWebflow, 100);
