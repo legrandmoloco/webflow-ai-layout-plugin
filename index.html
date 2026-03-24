@@ -861,11 +861,14 @@ Example format:
             // Debug current environment (safe cross-origin checks)
             console.log('🔍 Environment debug:');
             console.log('  - window.webflow:', typeof window.webflow);
+            console.log('  - window.Webflow:', typeof window.Webflow);
+            console.log('  - window.WebflowAPI:', typeof window.WebflowAPI);
             console.log('  - in iframe:', window.parent !== window);
             console.log('  - referrer:', document.referrer);
             console.log('  - location:', window.location.href);
             console.log('  - user agent contains Webflow:', navigator.userAgent.includes('Webflow'));
-            console.log('  - available globals:', Object.keys(window).filter(k => k.toLowerCase().includes('web')));
+            console.log('  - all globals:', Object.keys(window).sort());
+            console.log('  - webflow-related globals:', Object.keys(window).filter(k => k.toLowerCase().includes('webflow')));
 
             // Note: Webflow API is only available when plugin is installed in production
             if (!window.webflow && window.parent !== window) {
@@ -874,6 +877,14 @@ Example format:
 
             new SimpleAIPlugin();
         }
+
+        // Listen for potential Webflow API messages
+        window.addEventListener('message', (event) => {
+            console.log('📨 Received message:', event);
+            if (event.data && typeof event.data === 'object') {
+                console.log('📨 Message data:', event.data);
+            }
+        });
 
         // Try multiple initialization approaches
 
@@ -907,11 +918,19 @@ Example format:
                     attempts++;
                     console.log(`🔍 Attempt ${attempts}/${maxAttempts} - webflow:`, typeof window.webflow);
 
-                    if (typeof window.webflow !== 'undefined') {
-                        console.log('✅ Webflow API found!');
+                    // Check for different possible Webflow API patterns
+                    const webflowAPI = window.webflow || window.Webflow || window.WebflowAPI;
+
+                    if (webflowAPI && (webflowAPI.elementBuilder || webflowAPI.getBodyElement)) {
+                        console.log('✅ Webflow API found!', webflowAPI);
+                        window.webflow = webflowAPI; // Normalize to window.webflow
                         initializePlugin();
                     } else if (attempts >= maxAttempts) {
                         console.log('⏰ Timeout - initializing without Webflow API');
+                        console.log('🔍 Final check - available APIs:');
+                        console.log('  - window.webflow:', window.webflow);
+                        console.log('  - window.Webflow:', window.Webflow);
+                        console.log('  - window.WebflowAPI:', window.WebflowAPI);
                         initializePlugin();
                     } else {
                         setTimeout(checkWebflow, 100);
