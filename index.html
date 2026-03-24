@@ -777,82 +777,7 @@ Example format:
             }
         }
 
-        // Create a proxy webflow object that communicates with parent frame via postMessage
-        function createWebflowProxy() {
-            console.log('🔧 Creating Webflow proxy for iframe communication...');
-
-            let messageId = 0;
-            const pendingMessages = new Map();
-
-            // Listen for responses from parent frame
-            window.addEventListener('message', (event) => {
-                if (event.data && event.data.type === 'webflow-response') {
-                    const { id, result, error } = event.data;
-                    if (pendingMessages.has(id)) {
-                        const { resolve, reject } = pendingMessages.get(id);
-                        pendingMessages.delete(id);
-
-                        if (error) {
-                            reject(new Error(error));
-                        } else {
-                            resolve(result);
-                        }
-                    }
-                }
-            });
-
-            // Send message to parent frame and wait for response
-            function sendMessage(method, args = []) {
-                return new Promise((resolve, reject) => {
-                    const id = ++messageId;
-                    const timeout = setTimeout(() => {
-                        pendingMessages.delete(id);
-                        reject(new Error(`Webflow API call timeout: ${method}`));
-                    }, 10000);
-
-                    pendingMessages.set(id, { resolve, reject });
-
-                    const message = {
-                        type: 'webflow-api-call',
-                        id,
-                        method,
-                        args
-                    };
-
-                    console.log('📡 Sending webflow API call:', message);
-                    window.parent.postMessage(message, '*');
-                });
-            }
-
-            // Create proxy object with common Webflow API methods
-            return {
-                // Element creation methods
-                getBodyElement: () => sendMessage('getBodyElement'),
-
-                elementBuilder: (preset) => ({
-                    build: () => sendMessage('elementBuilder.build', [preset])
-                }),
-
-                elementPresets: {
-                    DivBlock: 'DivBlock',
-                    Section: 'Section',
-                    Heading: 'Heading',
-                    Paragraph: 'Paragraph',
-                    Link: 'Link',
-                    Image: 'Image',
-                    Button: 'Button',
-                    Form: 'Form',
-                    Input: 'Input',
-                    Textarea: 'Textarea',
-                    List: 'List',
-                    ListItem: 'ListItem'
-                },
-
-                // Utility methods
-                getCurrentPage: () => sendMessage('getCurrentPage'),
-                selectElement: (element) => sendMessage('selectElement', [element])
-            };
-        }
+        // Note: Removed custom createWebflowProxy - using Webflow's native implementation
 
         // Webflow plugin initialization - try multiple methods
         function initializePlugin() {
@@ -950,15 +875,17 @@ Example format:
                     // Check for different possible Webflow API patterns
                     const webflowAPI = window.webflow || window.Webflow || window.WebflowAPI;
 
-                    // Try createWebflowProxy if available
+                    // Try createWebflowProxy if available (Webflow's native proxy)
                     if (window.createWebflowProxy && !webflowAPI) {
                         console.log('🔧 Found createWebflowProxy, attempting to create Webflow API...');
                         try {
                             const proxyAPI = window.createWebflowProxy();
                             console.log('🔧 createWebflowProxy result:', proxyAPI);
-                            if (proxyAPI) {
+                            if (proxyAPI && typeof proxyAPI === 'object') {
+                                // Use the direct API methods from Webflow, not our postMessage proxy
                                 window.webflow = proxyAPI;
                                 console.log('✅ Webflow API created via proxy!', proxyAPI);
+                                console.log('🔍 Available methods:', Object.keys(proxyAPI));
                                 initializePlugin();
                                 return;
                             }
