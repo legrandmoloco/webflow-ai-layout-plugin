@@ -950,6 +950,23 @@ Example format:
                     // Check for different possible Webflow API patterns
                     const webflowAPI = window.webflow || window.Webflow || window.WebflowAPI;
 
+                    // Try createWebflowProxy if available
+                    if (window.createWebflowProxy && !webflowAPI) {
+                        console.log('🔧 Found createWebflowProxy, attempting to create Webflow API...');
+                        try {
+                            const proxyAPI = window.createWebflowProxy();
+                            console.log('🔧 createWebflowProxy result:', proxyAPI);
+                            if (proxyAPI) {
+                                window.webflow = proxyAPI;
+                                console.log('✅ Webflow API created via proxy!', proxyAPI);
+                                initializePlugin();
+                                return;
+                            }
+                        } catch (error) {
+                            console.log('❌ createWebflowProxy failed:', error);
+                        }
+                    }
+
                     if (webflowAPI && (webflowAPI.elementBuilder || webflowAPI.getBodyElement)) {
                         console.log('✅ Webflow API found!', webflowAPI);
                         window.webflow = webflowAPI; // Normalize to window.webflow
@@ -961,6 +978,15 @@ Example format:
                         console.log('  - window.Webflow:', window.Webflow);
                         console.log('  - window.WebflowAPI:', window.WebflowAPI);
                         console.log('  - all globals:', Object.keys(window).filter(k => k.toLowerCase().includes('webflow')));
+
+                        // Detailed inspection of createWebflowProxy
+                        if (window.createWebflowProxy) {
+                            console.log('🔧 createWebflowProxy function details:');
+                            console.log('  - type:', typeof window.createWebflowProxy);
+                            console.log('  - length:', window.createWebflowProxy.length);
+                            console.log('  - toString:', window.createWebflowProxy.toString());
+                        }
+
                         initializePlugin();
                     } else {
                         setTimeout(checkWebflow, 100);
